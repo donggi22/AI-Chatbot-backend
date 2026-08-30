@@ -1,23 +1,17 @@
-import { Module } from '@nestjs/common';
+import { Module, Logger } from '@nestjs/common';
 import { createObserveModule } from '@nestjs/observe';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
-import { ConfigModule } from './config/config.module.js';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { ConfigModule } from './config/config.module';
+import { pinoHttp } from './config/pino.config';
+import { LoggerModule } from 'nestjs-pino';
+import { globalProviders } from './core/providers';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
-  imports: [
-    // Distributed tracing, auto-correlated logs, request/job metrics, error
-    // telemetry, alarms, and more — out of the box. Sign up at https://observe.nestjs.com
-    ObserveModule.forRoot({
-      appKey: 'YOUR_APP_KEY',
-      appSecret: 'YOUR_APP_SECRET',
-      serviceId: 'server',
-    }),
-    ConfigModule,
-  ],
+  imports: [LoggerModule.forRoot({ pinoHttp }), ConfigModule],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, ...globalProviders],
 })
 export class AppModule {}
