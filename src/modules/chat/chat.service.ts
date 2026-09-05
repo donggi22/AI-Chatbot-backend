@@ -4,6 +4,8 @@ import { ChatGroq } from '@langchain/groq';
 import { Response } from 'express';
 import { ChatStream } from './types';
 import { PinoLogger } from 'nestjs-pino';
+import { createAgent } from 'langchain';
+import { getWeather } from './tools';
 
 @Injectable()
 export class ChatService {
@@ -11,12 +13,17 @@ export class ChatService {
     this.logger.setContext(ChatService.name);
   }
 
-  async sendMessage({ message }: SendMessageDto): Promise<{ answer: string }> {
-    const llm = new ChatGroq({ model: 'openai/gpt-oss-120b' });
+  async sendMessage({ message }: SendMessageDto) {
+    const agent = createAgent({
+      model: 'groq:openai/gpt-oss-120b',
+      tools: [getWeather],
+    });
 
-    const response = await llm.invoke(message);
+    const response = await agent.invoke({
+      messages: [{ role: 'human', content: message }],
+    });
 
-    return { answer: response.text };
+    return { answer: response.messages.at(-1)?.text ?? '' }; // .content가 문자열과 배열 둘 다 반환, .text는 항상 문자열로 반환
   }
 
   async streamMessage(dto: SendMessageDto, res: Response) {
