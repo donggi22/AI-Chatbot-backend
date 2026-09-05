@@ -6,6 +6,7 @@ import { ChatStream } from './types';
 import { PinoLogger } from 'nestjs-pino';
 import { createAgent } from 'langchain';
 import { getWeather } from './tools';
+import { createLoggingMiddleware } from './middlewares';
 
 @Injectable()
 export class ChatService {
@@ -17,6 +18,7 @@ export class ChatService {
     const agent = createAgent({
       model: 'groq:openai/gpt-oss-120b',
       tools: [getWeather],
+      middleware: [createLoggingMiddleware()],
     });
 
     const response = await agent.invoke({
