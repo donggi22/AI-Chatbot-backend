@@ -34,7 +34,7 @@ export const createLoggingMiddleware = (maxMessages: number = 50) => {
         request.toolCall.args,
       );
       const result = await handler(request);
-      console.log(`✅ Tool result: ${result}`);
+      console.log(`✅ Tool result: `, result);
       return result;
     },
   });
