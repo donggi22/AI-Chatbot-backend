@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { SendMessageDto } from './dto';
-import { ChatGroq } from '@langchain/groq';
 import { Response } from 'express';
 import { ChatStream } from './types';
 import { PinoLogger } from 'nestjs-pino';
@@ -33,19 +32,31 @@ export class ChatService {
     res.setHeader('cache-Control', 'no-cache');
 
     try {
-      const llm = new ChatGroq({
-        model: 'qwen/qwen3.8-27b',
+      const agent = createAgent({
+        model: 'groq:qwen/qwen3.8-27b',
+        tools: [getWeather, getTemperature],
+        middleware: [createLoggingMiddleware()],
       });
 
-      const stream = await llm.stream(dto.message);
-      const aiID = crypto.randomUUID();
-      for await (const chunk of stream) {
-        const chatStream: ChatStream = {
-          id: aiID,
-          role: 'ai',
-          content: chunk.text,
-        };
-        res.write(`${JSON.stringify(chatStream)}\n`);
+      const stream = await agent.stream(
+        {
+          messages: [{ role: 'human', content: dto.message }],
+        },
+        { streamMode: ['messages'] },
+      );
+
+      for await (const [event, arr] of stream) {
+        if (event === 'messages') {
+          const [chunk, metadata] = arr;
+          if (chunk?.type === 'ai' && chunk?.text) {
+            const chatStream: ChatStream = {
+              id: chunk.id ?? '',
+              role: 'ai',
+              content: chunk.text,
+            };
+            res.write(`${JSON.stringify(chatStream)}\n`);
+          }
+        }
       }
     } catch (error) {
       this.logger.error(error, 'Error streaming message');

@@ -1,9 +1,7 @@
-import { StringValidation } from 'zod/v3';
-
 export type ChatAIStream = {
   id: string;
   role: 'ai';
-  content: String;
+  content: string;
 };
 
 export type ChatStream = ChatAIStream;
