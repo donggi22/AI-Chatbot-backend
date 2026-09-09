@@ -6,6 +6,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { createAgent, createMiddleware } from 'langchain';
 import { getTemperature, getWeather } from './tools';
 import { createLoggingMiddleware } from './middlewares';
+import { AIMessage, ToolMessage } from '@langchain/core/messages';
 
 @Injectable()
 export class ChatService {
@@ -42,12 +43,44 @@ export class ChatService {
         {
           messages: [{ role: 'human', content: dto.message }],
         },
-        { streamMode: ['messages'] },
+        { streamMode: ['messages', 'updates'] },
       );
 
-      for await (const [event, arr] of stream) {
+      for await (const [event, data] of stream) {
+        // ! 중간 업데이트 스트림
+        if (event === 'updates') {
+          const chunk = data?.model_request?.messages?.at(-1);
+
+          //  AI Tool Call Args 추적
+          if (
+            chunk &&
+            AIMessage.isInstance(chunk) &&
+            chunk.tool_calls?.length
+          ) {
+            // 도구 호출 Args 스트림
+            for (const toolCall of chunk.tool_calls) {
+              console.log(
+                `🔧Tool Called: ${toolCall.name}(${toolCall.id})`,
+                toolCall.args,
+              );
+            }
+          }
+
+          // AI Tool Output 추적
+          const toolMessage = data?.tools?.messages?.at(-1);
+          if (toolMessage && ToolMessage.isInstance(toolMessage)) {
+            console.log(
+              `🛠️ Tool Output: ${toolMessage.name}(${toolMessage.tool_call_id})`,
+              {
+                content: toolMessage.content,
+              },
+            );
+          }
+        }
+
+        // ! AI 최종 결과 스트림
         if (event === 'messages') {
-          const [chunk, metadata] = arr;
+          const [chunk, metadata] = data;
           if (chunk?.type === 'ai' && chunk?.text) {
             const chatStream: ChatStream = {
               id: chunk.id ?? '',
