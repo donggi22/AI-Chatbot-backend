@@ -1,19 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { SendMessageDto } from './dto';
 import { Response } from 'express';
-import { ChatStream } from './types';
 import { PinoLogger } from 'nestjs-pino';
-import { createAgent, createMiddleware, tool } from 'langchain';
+import { createAgent } from 'langchain';
 import { getTemperature, getWeather } from './tools';
 import { createLoggingMiddleware } from './middlewares';
-import { AIMessage, ToolMessage } from '@langchain/core/messages';
-import {
-  getLastAIMessageChunk,
-  getLastToolMessage,
-  isAIChunkWithText,
-  isAIChunkWithToolCalls,
-} from '../../common/utils';
 import { ChatGroq } from '@langchain/groq';
+import { streamChat } from '../../common/utils';
+import { ChatStream } from './types';
 
 @Injectable()
 export class ChatService {
@@ -40,74 +34,31 @@ export class ChatService {
   }
 
   async streamMessage(dto: SendMessageDto, res: Response) {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('cache-Control', 'no-cache');
+    const agent = createAgent({
+      model: new ChatGroq({
+        model: 'qwen/qwen3.8-27b',
+        reasoningEffort: 'none',
+        maxTokens: 512,
+      }),
+      tools: [getWeather, getTemperature],
+      middleware: [createLoggingMiddleware()],
+    });
 
-    try {
-      const agent = createAgent({
-        model: new ChatGroq({
-          model: 'qwen/qwen3.8-27b',
-          reasoningEffort: 'none',
-          maxTokens: 512,
-        }),
-        tools: [getWeather, getTemperature],
-        middleware: [createLoggingMiddleware()],
-      });
-
-      const stream = await agent.stream(
-        {
-          messages: [{ role: 'human', content: dto.message }],
+    await streamChat(
+      res,
+      () => {
+        return agent.stream(
+          {
+            messages: [{ role: 'human', content: dto.message }],
+          },
+          { streamMode: ['messages', 'updates'] },
+        );
+      },
+      {
+        onError: (error) => {
+          this.logger.error(error, 'Error in chat stream');
         },
-        { streamMode: ['messages', 'updates'] },
-      );
-
-      for await (const [event, data] of stream) {
-        // ! 중간 업데이트 스트림
-        if (event === 'updates') {
-          const chunk = getLastAIMessageChunk(data);
-          //  AI Tool Call Args 추적
-          if (isAIChunkWithToolCalls(chunk)) {
-            // 도구 호출 Args 스트림
-            for (const toolCall of chunk.tool_calls) {
-              const chatStream: ChatStream = {
-                role: 'tool',
-                id: toolCall.id,
-                name: toolCall.name,
-                args: JSON.stringify(toolCall.args),
-              };
-              res.write(`${JSON.stringify(chatStream)}\n`);
-            }
-          }
-          // AI Tool Output 추적
-          const toolMessage = getLastToolMessage(data);
-          if (toolMessage && ToolMessage.isInstance(toolMessage)) {
-            const chatStream: ChatStream = {
-              role: 'tool',
-              id: toolMessage.tool_call_id,
-              name: toolMessage.name || '',
-              content: JSON.stringify(toolMessage.content),
-            };
-            res.write(`${JSON.stringify(chatStream)}\n`);
-          }
-        }
-
-        // ! AI 최종 결과 스트림
-        if (event === 'messages') {
-          const [chunk] = data;
-          if (isAIChunkWithText(chunk)) {
-            const chatStream: ChatStream = {
-              id: chunk.id,
-              role: 'ai',
-              content: chunk.text,
-            };
-            res.write(`${JSON.stringify(chatStream)}\n`);
-          }
-        }
-      }
-    } catch (error) {
-      this.logger.error(error, 'Error streaming message');
-    } finally {
-      res.end();
-    }
+      },
+    );
   }
 }
