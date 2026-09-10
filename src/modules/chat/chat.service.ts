@@ -3,7 +3,7 @@ import { SendMessageDto } from './dto';
 import { Response } from 'express';
 import { ChatStream } from './types';
 import { PinoLogger } from 'nestjs-pino';
-import { createAgent, createMiddleware } from 'langchain';
+import { createAgent, createMiddleware, tool } from 'langchain';
 import { getTemperature, getWeather } from './tools';
 import { createLoggingMiddleware } from './middlewares';
 import { AIMessage, ToolMessage } from '@langchain/core/messages';
@@ -69,21 +69,25 @@ export class ChatService {
           if (isAIChunkWithToolCalls(chunk)) {
             // 도구 호출 Args 스트림
             for (const toolCall of chunk.tool_calls) {
-              console.log(
-                `🔧Tool Called: ${toolCall.name}(${toolCall.id})`,
-                toolCall.args,
-              );
+              const chatStream: ChatStream = {
+                role: 'tool',
+                id: toolCall.id,
+                name: toolCall.name,
+                args: JSON.stringify(toolCall.args),
+              };
+              res.write(`${JSON.stringify(chatStream)}\n`);
             }
           }
           // AI Tool Output 추적
           const toolMessage = getLastToolMessage(data);
           if (toolMessage && ToolMessage.isInstance(toolMessage)) {
-            console.log(
-              `🛠️ Tool Output: ${toolMessage.name}(${toolMessage.tool_call_id})`,
-              {
-                content: toolMessage.content,
-              },
-            );
+            const chatStream: ChatStream = {
+              role: 'tool',
+              id: toolMessage.tool_call_id,
+              name: toolMessage.name || '',
+              content: JSON.stringify(toolMessage.content),
+            };
+            res.write(`${JSON.stringify(chatStream)}\n`);
           }
         }
 

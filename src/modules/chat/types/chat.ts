@@ -4,4 +4,12 @@ export type ChatAIStream = {
   content: string;
 };
 
-export type ChatStream = ChatAIStream;
+export type ChatToolStream = {
+  id: string;
+  role: 'tool';
+  name: string;
+  args?: string;
+  content?: string;
+};
+
+export type ChatStream = ChatAIStream | ChatToolStream;
