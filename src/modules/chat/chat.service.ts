@@ -13,6 +13,7 @@ import {
   isAIChunkWithText,
   isAIChunkWithToolCalls,
 } from '../../common/utils';
+import { ChatGroq } from '@langchain/groq';
 
 @Injectable()
 export class ChatService {
@@ -22,7 +23,11 @@ export class ChatService {
 
   async sendMessage({ message }: SendMessageDto) {
     const agent = createAgent({
-      model: 'groq:qwen/qwen3.8-27b',
+      model: new ChatGroq({
+        model: 'qwen/qwen3.8-27b',
+        reasoningEffort: 'none',
+        maxTokens: 512,
+      }),
       tools: [getWeather, getTemperature],
       middleware: [createLoggingMiddleware()],
     });
@@ -40,7 +45,11 @@ export class ChatService {
 
     try {
       const agent = createAgent({
-        model: 'groq:qwen/qwen3.8-27b',
+        model: new ChatGroq({
+          model: 'qwen/qwen3.8-27b',
+          reasoningEffort: 'none',
+          maxTokens: 512,
+        }),
         tools: [getWeather, getTemperature],
         middleware: [createLoggingMiddleware()],
       });
