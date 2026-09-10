@@ -5,7 +5,8 @@ export function isAIChunkWithToolCalls(
 ): chunk is AIMessageChunk & { tool_calls: ToolCall[] } {
   return (
     chunk?.type === 'ai' &&
-    Array.isArray(chunk?.tool_calls && chunk.tool_calls.length > 0)
+    Array.isArray(chunk?.tool_calls) &&
+    chunk.tool_calls.length > 0
   );
 }
 
