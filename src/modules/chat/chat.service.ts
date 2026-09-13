@@ -6,6 +6,7 @@ import { createAgent } from 'langchain';
 import { getTemperature, getWeather } from './tools';
 import { createLoggingMiddleware } from './middlewares';
 import { ChatGroq } from '@langchain/groq';
+import { ChatOpenAI } from '@langchain/openai';
 import { streamChat } from '../../common/utils';
 import { ChatStream } from './types';
 
@@ -35,10 +36,16 @@ export class ChatService {
 
   async streamMessage(dto: SendMessageDto, res: Response) {
     const agent = createAgent({
-      model: new ChatGroq({
-        model: 'qwen/qwen3.8-27b',
-        reasoningEffort: 'none',
-        maxTokens: 512,
+      // model: new ChatGroq({
+      model: new ChatOpenAI({
+        // model: 'qwen/qwen3.8-27b',
+        // reasoningEffort: 'none',
+        // maxTokens: 512,
+        model: 'solar-pro4',
+        apiKey: process.env.UPSTAGE_API_KEY,
+        configuration: {
+          baseURL: 'https://api.upstage.ai/v1',
+        },
       }),
       tools: [getWeather, getTemperature],
       middleware: [createLoggingMiddleware()],
